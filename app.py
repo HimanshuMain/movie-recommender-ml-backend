@@ -13,10 +13,9 @@ def home():
 @app.route("/recommend", methods=["GET"])
 def get_recommendations():
     title = request.args.get("title")
-    recommendations = recommend(title)
-    return jsonify({"recommendations": recommendations})
+    results = recommend(title)
+    return jsonify({"recommendations": results})
 
 if __name__ == "__main__":
-    
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
