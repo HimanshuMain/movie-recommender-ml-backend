@@ -3,13 +3,14 @@ import ast
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-# ---------- Load datasets ----------
+#load dataset
 movies = pd.read_csv("tmdb_5000_movies.csv")
 credits = pd.read_csv("tmdb_5000_credits.csv")
 
-
+# Merge datasets on title
 movies = movies.merge(credits, on="title")
 
+# HELPER FUNCTIONS
 def parse_names(text, limit=None):
     try:
         data = ast.literal_eval(text)
@@ -28,7 +29,7 @@ def get_director(crew):
         pass
     return ""
 
-# ---------- Feature Engineering --------
+# FEATURE ENGINEERING
 movies["genres"] = movies["genres"].apply(parse_names)
 movies["keywords"] = movies["keywords"].apply(parse_names)
 movies["cast"] = movies["cast"].apply(lambda x: parse_names(x, limit=5))
@@ -42,33 +43,49 @@ movies["combined_features"] = (
     movies["director"]
 )
 
-# ---------- Vectorization ----------
-vectorizer = TfidfVectorizer(stop_words="english", max_features=10000)
-tfidf_matrix = vectorizer.fit_transform(movies["combined_features"])
+# VECTORIZATION
+vectorizer = TfidfVectorizer(
+    stop_words="english",
+    max_features=10000
+)
 
+tfidf_matrix = vectorizer.fit_transform(movies["combined_features"])
 similarity_matrix = cosine_similarity(tfidf_matrix)
 
-# ---------- Hybrid Recommendation ----------
-def recommend(title, top_n=25):
-    if title not in movies["title"].values:
-        return fallback_recommendations()
+# FALLBACK (USED ONLY IF NOTHING MATCHES)
+def fallback_recommendations(top_n=20):
+    sample = movies.sample(top_n)
+    return [
+        {
+            "title": row["title"],
+            "similarity": 50.0
+        }
+        for _, row in sample.iterrows()
+    ]
 
-    idx = movies[movies["title"] == title].index[0]
+# MAIN RECOMMENDER
+def recommend(title, top_n=20):
+    if not title:
+        return fallback_recommendations(top_n)
+
+    
+    matches = movies[movies["title"].str.contains(title, case=False, na=False)]
+
+    if matches.empty:
+        return fallback_recommendations(top_n)
+
+    
+    idx = matches.index[0]
+
     scores = list(enumerate(similarity_matrix[idx]))
     scores = sorted(scores, key=lambda x: x[1], reverse=True)
 
     recommendations = []
-    for i, score in scores[1:top_n + 1]:
+
+    for i, score in scores[1 : top_n + 1]:
         recommendations.append({
             "title": movies.iloc[i]["title"],
             "similarity": round(score * 100, 2)
         })
 
     return recommendations
-
-def fallback_recommendations():
-    sample = movies.sample(10)
-    return [
-        {"title": row["title"], "similarity": 50.0}
-        for _, row in sample.iterrows()
-    ]
