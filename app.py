@@ -1,0 +1,19 @@
+from flask import Flask, request, jsonify
+from recommender import recommend
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app)
+
+@app.route("/")
+def home():
+    return "Movie Recommendation ML API is running"
+
+@app.route("/recommend", methods=["GET"])
+def get_recommendations():
+    title = request.args.get("title")
+    recs = recommend(title)
+    return jsonify({"recommendations": recs})
+
+if __name__ == "__main__":
+    app.run(debug=True)
